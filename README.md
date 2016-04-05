@@ -1,4 +1,4 @@
 FCC
 =======
 
-Tools for high-energy physics projects
+Tools for FCC studies
