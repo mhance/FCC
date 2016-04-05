@@ -1,0 +1,44 @@
+// Dear emacs, this is -*- c++ -*-
+
+#ifndef COMMON_HIST_ICC
+#define COMMON_HIST_ICC
+
+template <typename T>
+Hist<T>::Hist(T* var, std::string name,
+	      int nbins, float low, float high, 
+	      std::string tag, std::string title,
+	      float scale) :
+  HistBase1D(name, tag, nbins, low, high, title, scale),
+  m_var(var){
+}
+  
+template <typename T>
+Hist<T>* Hist<T>::Clone(std::string newtag){
+  return new Hist<T>(m_var,
+		     this->GetName(),
+		     this->GetNBins(),
+		     this->GetBinLow(),
+		     this->GetBinHigh(),
+		     newtag,
+		     this->GetTitle(),
+		     this->GetScale());
+}
+
+template <typename T>
+void Hist<T>::Fill(int hash, float weight){
+  GetHist(hash)->Fill(*m_var*GetScale(), weight);
+}
+
+
+// this one seems wrong....
+template <typename T>
+void Hist<T>::Fill(int iter, int hash, float weight){
+  return Fill(hash, weight);
+}
+
+template <typename T>
+void Hist<T>::Fill(int iter, std::vector<int> &binnos, float weight){ 
+  GetHist(binnos)->Fill(*m_var*GetScale(), weight);
+}
+
+#endif

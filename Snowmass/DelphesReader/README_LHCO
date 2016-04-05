@@ -1,0 +1,66 @@
+Using the DelphesReader package to dump LHCO files
+==================================================
+
+First be sure the proper environment is set up:
+
+   cd ../
+   source setup.sh
+   cd DelphesReader
+
+
+---------------
+
+The quick example, to get started:
+
+   mkdir -p GOGO_decoupledSQ_100TeV
+   ./bin/DRMain \
+	-T 2 \
+   	-f ../../signal/GOGO-decoupledSQ.GO01000.qq.N00995.Delphes3.root \
+	-s GOGO_decoupledSQ_100TeV \
+	-t NoPileUp.GOGO.GOGO01000.qq.00995_100TEV \
+	-c 4.71e-06 \
+	-S \
+	-o GOGO_decoupledSQ_100TeV \
+
+
+A directory to contain the output of the program is created with "mkdir", and then the program
+is run.  The command line options are:
+
+-T 2   : This configures the program to dump LHCO text files, rather than histograms or ROOT ntuples.
+         Setting 0 or 1 would change the output format.
+-f ... : This sets the input Delphes file.
+-s ... : This is a tag to be appended to the output file, typically indicating which grid is scanned
+-t ... : This is a tag to be appended to the output file, typically indicating the grid point
+-c ... : This is the cross section for the sample provided in the input file
+-S     : This indicates that these are "SLAC" style inputs, where the sum of weights in the input file is
+         fixed at 1.0.  So, the weights are scaled up by the cross section, and then scaled down by the 
+	 number of events.  For the normal background samples, this flag would not be set, as the sum
+	 of weights is not fixed to be 1.0.
+-o ... : This sets the directory where the output will be dumped
+
+The result of this will be a text file, located in the specified directory, with the event details in
+LHCO format.  The event weights are stored as an additional field in the line containing the event number,
+such that the total sample (sum of weights) corresponds to 1 fb-1 of integrated luminosity.
+
+----------------
+
+If you want to change the code that does the dumping, you can look at this file:
+
+   src/LHCODumper.cxx
+
+A lot of the basic stuff involved with reading Delphes files is contained in a base class (DelphesReaderBase),
+so the code is all in the "ProcessEvent" function.  The different Delphes collections are read into an
+intermediate event object, which is then used when dumping the text output.  (The dumping could proceed
+directly from the Delphes objects themselves, the intermediate event format is just something that was carried 
+over from another DelphesReader algorithm.)
+
+If you find you need to add more command line options to the executable, you should edit:
+
+   src/DRMain.cxx
+
+which is what loads and runs the LHCODumper.  
+
+After making changes to either the LHCODumper or DRMain, be sure to re-build the shared library and executable:
+
+   make
+

@@ -1,0 +1,156 @@
+Installation and Compilation
+======================================================
+
+1) To check out the code, do:
+
+svn co svn+ssh://svn.cern.ch/reps/atlasinst/Institutes/LBNL/Snowmass/code/trunk Snowmass
+
+That will retrieve the trunk, modify as appropriate to get tags or to name the directory something else.
+
+
+2) There are some external packages that you'll need.  Some will get checked out automatically 
+   in step (1), others need:
+
+./get_externals.sh
+
+
+3) If you need common background samples, you can use:
+
+./get_data.sh
+
+But first check to see if the samples you want aren't already available in:
+
+/eliza18/atlas/mhance/Snowmass/data/CommonBG
+
+
+4) If you want to run Delphes (e.g. you have a signal grid that needs to be simulated) the DelphesRunner 
+   area has some scripts to help do that (specifically for PDSF).  But there isn't a ton of stuff there.
+
+
+5) Most of the work exists in the DelphesReader area, so be sure you can build that:
+
+cd DelphesReader
+make
+
+
+
+
+Using the tools
+======================================================
+
+The tools in DelphesReader are set up as separate executables for each discrete task in an analysis, including:
+
+* Running on the delphes files to produce a flat NTuple or histograms
+* Using that flat NTuple to train an MVA algorithm with TMVA
+* Choosing an operating point
+* Computing limits and discovery significances
+
+The tools are bound together in scripts that clump a few tasks together, for example running on the delphes file
+and training TMVA in one step, and then choosing operating points and computing limits in a second step.
+
+
+Running on Delphes files
+-------------------------------
+
+To run on Delphes files, there's a single application called "DRMain".  It takes several arguments specifying the
+input data files, the cross section, what analysis to run on the data, and other options having to do with weighting
+and units (MeV vs GeV) and so on.  
+
+DRMain is basically just a wrapper for the individual analysis classes, which run on the events and fill some output
+(NTuples or histograms).  The analysis classes inherit from a base class that handles stuff common to all analyses,
+like setting up the event loop, computing the weights for each event, providing easy access to the Delphes interface
+classes, and so on.  
+
+To implement a new analysis, the procedure would be:
+
+1) Create a new class that inherits from DelphesReaderBase
+2) Fill it with your analysis cuts, output NTuple/histograms, etc (for examples see DirectGaugino and StrongProduction)
+3) Add that analysis type as a new option in DRMain
+
+The output from DRMain should be a ROOT file with an NTuple or histograms that you can then use with TMVA, or for
+limit setting, etc.  All of the weights are such that the sample should be normalized to 1 fb-1.  The input cross sections
+should also be input in the same units.
+
+
+Running TMVA
+-------------------------------
+
+There's a script called "scripts/train_MVA.C" which can be compiled into "bin/train_MVA".  The script isn't fancy, take a look
+at it to see how it runs, and see an example of how to call it in "scripts/batch_run.sh".
+
+It's also possible to specify at run-time additional cuts to use when doing the classification, e.g. "MET>150".  These
+same cuts should also be specified in subsequent analysis steps to ensure consistency, but this is left up to the
+analyzer.
+
+The output from this script is a ROOT file that contains all the TMVA training info for the samples.
+
+A separate script called "scripts/classify.C" will take an input ROOT file with a TTree and classify the events using the
+MVA weights created in train_MVA.  It adds the classifier output as a separate branch in the TTree, and either overwrites
+the existing file or creates a new file with a copy of the original TTree along with the extra classifier info.  So, for
+instance, if we have a grid of signal points and a separate BDT trained at each point, then we'd want to copy the background
+TTree for each signal point and store the classifier results at each grid point in separate files.  You can see how this
+works in "scripts/batch_run.sh".
+
+
+Choosing cuts
+-------------------------------
+
+There's another script called "scripts/choose_operating_point.C" which can also be compiled into a binary.  Again, the script
+isn't very fancy.  It assumes you have ROOT files containing TTrees for signal and background(s), and for a given discriminating
+variable (e.g. MET, m_eff, BDTScore) chooses a working point using some significance metric.  Currently we've been using Z_n,
+which is described in the ATLAS Expected Performance book, and takes systematic uncertainties on the background estimates into 
+account, but it's easy to switch from that to using S/B or some other metric by changing the code and recompiling.  (Or we could
+add it as a command-line option.)  There's an additional requirement that the number of signal events be greater than 3.
+
+The tool takes the luminosity as input, so be sure to specify that here.  If any cuts need to be specified before choosing
+the optimal point (e.g. "MET>150") then those should be passed in using command line options.
+
+The output from this tool is a series of numbers (sent to stdout) that says what sample this is, the cut value, efficiencies,
+rejections, significances, and so on.  Typically I pipe this into some shell variables or into a temporary file so that all
+of the information can be dumped along with the limits and p0's at the end of the analysis chain.
+
+
+Running limits
+-------------------------------
+
+The limit code is a python script called "scripts/make_limits.py".  It takes as input files containing the number of signal
+and background events (e.g. the output from choose_operating_point).  It makes some standard assumptions about different 
+uncertainties (see the code for details).  The output is a bit of a pain to interpret, but basically it dumps the median
+expected 95% CL upper limit on the cross section normalized to the cross section expected from the backgrounds, the 1 and
+2 sigma uncertainties for that upper limit, the p0 for discovery, and the number of standard deviations corresponding to
+that p0.  
+
+
+
+Utility scripts
+-------------------------------
+
+To put everything together, there are two top-level scripts.
+
+1) To run the Delphes->TTree conversion and the TMVA training/classification (if any):
+
+scripts/batch_run_wrap.sh <grid name>
+
+
+2) To choose the operating points and run limits using different integrated luminosities:
+
+scripts/batch_optlimits_wrap.sh <grid name>
+
+
+Both of the above scripts submit arrays of qsub jobs, one job for each point in the signal grid (and separate jobs
+for different luminosities or discriminating variables for the limits script).  As of this writing, they both support
+two different signal grids, so they're somewhat general, but there are a ton of hacks to cover specific details of
+the grids I have now.  So feel free to use them as templates for your own scripts, rather than as general all-purpose
+solutions.
+
+The output of the limits script will be text files, one per job array, containing the signal grid info, the working
+point information for each grid point, and the limits/p0's/etc.
+
+
+Making plots
+-------------------------------
+
+To make 2D plots using the text files created above, there's a script called "scripts/make_limit_plots.C".  This should
+be compiled/run in interactive ROOT, not as a standalone application.  Use at your own risk, or feel free to spin your own.
+
+

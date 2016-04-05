@@ -1,0 +1,25 @@
+// Dear emacs, this is -*- c++ -*-
+
+#ifndef COMMON_BIN_ICC
+#define COMMON_BIN_ICC
+
+template <typename T>
+Bin<T>::Bin(std::string name, 
+	    std::vector<float> bounds, 
+	    T* var,
+	    float scale) :
+  BinBase(name, bounds,scale),
+  m_var(var){
+}
+
+template <typename T>
+int Bin<T>::GetBinNumber(){
+  return BinBase::GetBinNumber(*m_var*GetScale());
+}
+
+template <typename T>
+int Bin<T>::GetBinNumber(int iter){
+  return GetBinNumber();
+}
+
+#endif

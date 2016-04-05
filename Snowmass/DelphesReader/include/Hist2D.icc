@@ -1,0 +1,54 @@
+// Dear emacs, this is -*- c++ -*-
+
+#ifndef COMMON_HIST2D_ICC
+#define COMMON_HIST2D_ICC
+
+template <typename Tx, typename Ty>
+Hist2D<Tx,Ty>::Hist2D(Tx* varx, Ty* vary,
+		      std::string name,
+		      int nbinsx, float lowx, float highx, 
+		      int nbinsy, float lowy, float highy, 
+		      std::string tag, std::string title,
+		      float scale) :
+  HistBase2D(name, tag, nbinsx, lowx, highx, nbinsy, lowy, highy, title, scale),
+  m_varX(varx),
+  m_varY(vary){
+}
+  
+template <typename Tx, typename Ty>
+Hist2D<Tx,Ty>* Hist2D<Tx,Ty>::Clone(std::string newtag){
+  return new Hist2D<Tx,Ty>(m_varX, m_varY,
+			   this->GetName(),
+			   this->GetNBinsX(),
+			   this->GetBinLowX(),
+			   this->GetBinHighX(),
+			   this->GetNBinsY(),
+			   this->GetBinLowY(),
+			   this->GetBinHighY(),
+			   newtag,
+			   this->GetTitle(),
+			   this->GetScale());
+}
+
+template <typename Tx, typename Ty>
+void Hist2D<Tx,Ty>::Fill(int hash, float weight){
+  ((TH2*)GetHist(hash))->Fill(*m_varX*GetScale(), 
+			      *m_varY*GetScale(),
+			      weight);
+}
+
+
+// this one seems wrong....
+template <typename Tx, typename Ty>
+void Hist2D<Tx,Ty>::Fill(int iter, int hash, float weight){
+  return Fill(hash, weight);
+}
+
+template <typename Tx, typename Ty>
+void Hist2D<Tx,Ty>::Fill(int iter, std::vector<int> &binnos, float weight){ 
+  ((TH2*)GetHist(binnos))->Fill(*m_varX*GetScale(), 
+				*m_varY*GetScale(),
+				weight);
+}
+
+#endif
