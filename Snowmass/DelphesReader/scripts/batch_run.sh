@@ -1,17 +1,19 @@
-#$ -o batch_logs/batch_$JOB_NAME_$TASK_ID.log
+#!/bin/bash
 
 shopt -s expand_aliases
 
-taskindex=$SGE_TASK_ID
+DelphesReaderDir=/export/home/mhance/FCC/Snowmass/DelphesReader
+export ATLAS_LOCAL_ROOT_BASE="/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase"
+source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> /dev/null 2>&1
+source ${ATLAS_LOCAL_ROOT_BASE}/packageSetups/atlasLocalROOTSetup.sh --skipConfirm --rootVersion="5.34.25-x86_64-slc6-gcc48-opt"
 
-DelphesReaderDir=/export/share/diskvault/mhance/FCC/DelphesReader
-if [[ $taskindex != "" ]]; then
-    export ATLAS_LOCAL_ROOT_BASE="/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase"
-    source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh >> /dev/null 2>&1
-    source ${ATLAS_LOCAL_ROOT_BASE}/packageSetups/atlasLocalROOTSetup.sh --skipConfirm --rootVersion="5.34.05-x86_64-slc5-gcc4.3"
-    cd $DelphesReaderDir
-else
+if [[ $1 != "" ]]; then
     taskindex=$1
+fi
+
+cd $DelphesReaderDir
+
+if [[ $grid == "" ]]; then
     grid="GO_decoupledSQ_100TeV_LHE_TTALL"
     unitsopt=""
     doMain=1
@@ -21,13 +23,19 @@ fi
 
 /bin/ls -ltrha
 
-basedir=../data
+# need to change this for background at some point
+basedir=/export/share/data/mhance/FCC/data
+signaldir=Signal/SUSY/$grid/Delphes-3.0.9.1
+
+echo "signaldir=$basedir/$signaldir"
 
 #signaldir=Signal/SUSY1/$grid/Delphes-3.0.9.1
 #scan_summary=$basedir/$signaldir/scan_summary_summary.dat
 
-signaldir=Signal/SUSY/$grid/Delphes-3.0.9.1
 scan_summary=$basedir/$signaldir/scan_summary.dat
+
+outputdir=/export/share/dirac/mhance/FCC/DelphesReader
+mkdir -p $outputdir/$grid
 
 line=$(grep -v "#" $scan_summary | head -${taskindex} | tail -1)
 
@@ -113,7 +121,7 @@ if [[ $doMain != "" ]]; then
 	-s "$grid" \
 	-t "$pileup.$prefix" \
 	-c $fixedsigma \
-	-o $grid \
+	-o ${outputdir}/$grid \
 	-T ${analysistype} \
 	${SLACopt}
 
@@ -128,7 +136,7 @@ if [[ $doMain != "" ]]; then
     if [[ $sigma2 != "" && $nevents2 != "" && $prefix2 != "" ]]; then
 	fixedsigma2=$(echo $sigma2 | awk '{print $1*1000.}')
 
-	rm $grid/delphes.${grid}.${prefix2}.root
+	rm ${outputdir}/$grid/delphes.${grid}.${prefix2}.root
 
 	echo $basedir/$grid/Decayed/Events/$grid.$prefix.Delphes3.root
 	ls $basedir/$grid/Decayed/Events/$grid.$prefix.Delphes3.root
@@ -138,18 +146,18 @@ if [[ $doMain != "" ]]; then
 	    -s "$grid" \
 	    -t "$prefix2" \
 	    -c $fixedsigma2 \
-	    -o $grid \
+	    -o ${outputdir}/$grid \
 	    -T ${analysistype} \
 	    ${unitsopt} \
 	    ${SLACopt}
 
 	hadd \
-	    -f $grid/delphes.${grid}.${prefix}.tmp.root \
-	    $grid/delphes.${grid}.${prefix}.root \
-	    $grid/delphes.${grid}.${prefix2}.root \
+	    -f ${outputdir}/$grid/delphes.${grid}.${prefix}.tmp.root \
+	    ${outputdir}/$grid/delphes.${grid}.${prefix}.root \
+	    ${outputdir}/$grid/delphes.${grid}.${prefix2}.root \
 
-	mv $grid/delphes.${grid}.${prefix}.tmp.root $grid/delphes.${grid}.${prefix}.root
-	rm $grid/delphes.${grid}.${prefix2}.root
+	mv ${outputdir}/$grid/delphes.${grid}.${prefix}.tmp.root${outputdir}/$grid/delphes.${grid}.${prefix}.root
+	rm ${outputdir}/$grid/delphes.${grid}.${prefix2}.root
     fi
 
 fi
